@@ -25,21 +25,27 @@ func transfer(c echo.Context) error {
 	defer c.Request().Body.Close()
 	body, _ := ioutil.ReadAll(c.Request().Body)
 	req, err := http.NewRequest(c.Request().Method, url, bytes.NewBuffer(body))
+	if err != nil {
+		log.Println("locap error", err)
+		return err
+	}
 	for k, v := range c.Request().Header {
 		req.Header.Set(k, strings.Join(v, ","))
 	}
-	if err != nil {
-		return nil
-	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil
+		log.Println("locap error", err)
+		return err
 	}
 	defer resp.Body.Close()
 	for k, v := range resp.Header {
 		c.Response().Header().Set(k, strings.Join(v, ","))
 	}
-	respBody, _ := ioutil.ReadAll(resp.Body)
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println("locap error", err)
+		return err
+	}
 	return c.String(resp.StatusCode, string(respBody))
 }
 
