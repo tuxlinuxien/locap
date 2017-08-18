@@ -9,8 +9,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
 	"github.com/urfave/cli"
 )
 
@@ -20,42 +18,70 @@ var (
 	client      = &http.Client{}
 )
 
-func transfer(c echo.Context) error {
-	var url = destination + c.Request().URL.RequestURI()
-	defer c.Request().Body.Close()
-	body, _ := ioutil.ReadAll(c.Request().Body)
-	req, err := http.NewRequest(c.Request().Method, url, bytes.NewBuffer(body))
-	if err != nil {
-		log.Println("locap error", err)
-		return err
+type handler struct{}
+
+func (s *handler) CORS(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Origin") != "" {
+		w.Header().Add("Access-Control-Allow-Origin", r.Header.Get("Origin"))
+	} else {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
 	}
-	for k, v := range c.Request().Header {
+	w.Header().Add("Access-Control-Max-Age", "3600")
+	w.Header().Add("Access-Control-Allow-Credentials", "true")
+	w.Header().Add("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
+	w.Header().Add("Access-Control-Allow-Headers", "X-Requested-With, Origin, Content-Type, X-Auth-Token, Authorization")
+}
+
+func (s *handler) WriteError(w http.ResponseWriter, err error) {
+	log.Println("locap error", err)
+	w.WriteHeader(http.StatusInternalServerError)
+	w.Write([]byte(http.StatusText(http.StatusInternalServerError)))
+}
+
+func (s *handler) Transfer(w http.ResponseWriter, r *http.Request) {
+	var url = destination + r.URL.RequestURI()
+	defer r.Body.Close()
+	body, _ := ioutil.ReadAll(r.Body)
+	req, err := http.NewRequest(r.Method, url, bytes.NewBuffer(body))
+	if err != nil {
+		s.WriteError(w, err)
+		return
+	}
+	for k, v := range r.Header {
 		req.Header.Set(k, strings.Join(v, ","))
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Println("locap error", err)
-		return err
+		s.WriteError(w, err)
+		return
 	}
 	defer resp.Body.Close()
 	for k, v := range resp.Header {
-		c.Response().Header().Set(k, strings.Join(v, ","))
+		w.Header().Set(k, strings.Join(v, ","))
 	}
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println("locap error", err)
-		return err
+		s.WriteError(w, err)
+		return
 	}
-	return c.String(resp.StatusCode, string(respBody))
+	w.WriteHeader(resp.StatusCode)
+	w.Write(respBody)
 }
 
-func server() {
-	e := echo.New()
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-	e.Use(middleware.CORS())
-	e.Any("*", transfer)
-	e.Logger.Fatal(e.Start(fmt.Sprintf(":%d", port)))
+func (s *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.Method, r.URL.RequestURI())
+	s.CORS(w, r)
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusNoContent)
+	} else {
+		s.Transfer(w, r)
+	}
+}
+
+func serverHTTP() {
+	var p = fmt.Sprintf(":%d", port)
+	log.Println("Accepting connections from:", p)
+	http.ListenAndServe(p, &handler{})
 }
 
 func main() {
@@ -85,7 +111,7 @@ func main() {
 			log.Println("--destination should be set")
 			return nil
 		}
-		server()
+		serverHTTP()
 		return nil
 	}
 
