@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -74,6 +75,10 @@ func main() {
 	app.Action = func(c *cli.Context) error {
 		port = c.Int("port")
 		destination = c.String("destination")
+		if destination == "" {
+			log.Println("--destination should be set")
+			return nil
+		}
 		server()
 		return nil
 	}
