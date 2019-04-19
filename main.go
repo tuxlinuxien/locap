@@ -28,7 +28,7 @@ func (s *handler) CORS(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Add("Access-Control-Max-Age", "3600")
 	w.Header().Add("Access-Control-Allow-Credentials", "true")
-	w.Header().Add("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
+	w.Header().Add("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH")
 	w.Header().Add("Access-Control-Allow-Headers", "X-Requested-With, Origin, Content-Type, X-Auth-Token, Authorization")
 }
 
